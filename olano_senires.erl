@@ -1,52 +1,48 @@
 -module(olano_senires).
 -compile(export_all).
 
-% Function to receive messages
-receiveMessage(ReceiverName) -> 
-    % io:format("~s: ", [ReceiverName]),
+receiveMessage(ReceiverName) ->
     receive
-        bye -> 
+        bye -> %when bye message is received
             io:format("~nYour partner disconnected~n"),
-            % global:send(self(), bye),
-            halt(); % Exit the function
-        {SenderName, String} -> 
-            io:format("~s: ~s~n", [SenderName, String]),
-           
-            receiveMessage(ReceiverName)  % Recursively wait for more messages
+            halt(); %exit the erlang shell of receiving node, reference: erlang.org/docs/26/man/erlang
+        {SenderName, String} -> %receives sendername and string message
+            io:format("~s: ~s~n", [SenderName, String]), %print received message with name of sender
+            receiveMessage(ReceiverName)  %recursively wait for other messages
     end.
 
-% Function to send messages (directly called in the main process)
+
 sendMessage(SenderName, ReceiverName) -> 
-    % io:format("~s: ", [SenderName]),  % Explicit prompt for message
-    String = string:trim(io:get_line("You: ")),  % Capture the input after the prompt
+    String = string:trim(io:get_line("You: ")),  %get message input
     case String of
         "bye" -> 
-            global:send(ReceiverName, bye),  % Send the 'bye' message globally
+            global:send(ReceiverName, bye),  %sends bye to PID(Receivername) globally reference: erlang.org/doc/apps/kernel/global.html
             ok,
-            halt();  % Terminates the chat
+            halt();  %exit erlang shell of sending node
         _ -> 
-            global:send(ReceiverName, {SenderName, String}),  % Send the message globally
-            sendMessage(SenderName, ReceiverName)  % Continue sending messages
+            global:send(ReceiverName, {SenderName, String}),  %send name of sender and string message to receiver globally
+            sendMessage(SenderName, ReceiverName)  %loop back to send more messages
     end.
 
-% Initialize chat (local node)
+%Initialize node 1
 init_chat() -> 
-    _Name = string:trim(io:get_line("Name: ")),  % Request user name but ignore it for now
-    Self = spawn(olano_senires, receiveMessage, [_Name]),  % Spawn the receiving process
-    global:register_name(receiveMessage_local, Self),  % Register the receiving process globally
-    io:format("Chat initialized locally. You can now send and receive messages.~n"),
-    sendMessage(_Name, receiveMessage_remote).  % Call sendMessage with global name
+    _Name = string:trim(io:get_line("Name: ")),  %get name
+    Self = spawn(olano_senires, receiveMessage, [_Name]),  %spawn the receiving process
+    global:register_name(receiveMessage_local, Self),  %register the receiving spawned process globally
+    io:format("Successfully connected. You can now send and receive messages.~n"),
+    sendMessage(_Name, receiveMessage_remote).  %Call sendMessage with global name
 
-% Initialize chat with another node (distributed)
+%Initialize node 2 using node 1
 init_chat2(ReceiverNode) -> 
-    _Name = string:trim(io:get_line("Name: ")),  % Request user name but ignore it
-    case net_adm:ping(ReceiverNode) of
-        pong ->  % If ping is successful, proceed
-            Self = spawn(olano_senires, receiveMessage, [_Name]),
-            global:register_name(receiveMessage_remote, Self),  % Register the receiving process globally
-            io:format("Connected to receiver node: ~p. Chat initialized.~n", [ReceiverNode]),
-            sendMessage(_Name, receiveMessage_local);  % Call sendMessage with global name
-        pang ->  % Handle the case where the receiver node is not reachable
-            io:format("Receiver node ~p is unreachable.~n", [ReceiverNode]),
-            init_chat2(ReceiverNode)  % Optionally, retry the connection
+    _Name = string:trim(io:get_line("Name: ")),  
+    case net_adm:ping(ReceiverNode) of %try connecting node 2 to node 1
+        pong ->  %if connection is successful
+            Self = spawn(olano_senires, receiveMessage, [_Name]), %spawn receive message
+            global:register_name(receiveMessage_remote, Self),  %register the receiving spawned process globally where receiveMessage_remote is associated with the pid of the spawned process
+                                                                %reference: erlang.org/doc/apps/kernel/global.html
+            io:format("Successfully connected. You can now send and receive messages.~n"),
+            sendMessage(_Name, receiveMessage_local);  %call sendMessage with global name
+        pang ->  %if connection not successful
+            io:format("Unable to make a connection."),
+            ok
     end.
