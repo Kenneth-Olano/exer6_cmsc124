@@ -7,8 +7,8 @@ receiveMessage(ReceiverName) ->
     receive
         bye -> 
             io:format("~nYour partner disconnected~n"),
-            global:send(self(), bye),
-            ok;  % Exit the function
+            % global:send(self(), bye),
+            halt(); % Exit the function
         {SenderName, String} -> 
             io:format("~s: ~s~n", [SenderName, String]),
            
@@ -18,11 +18,12 @@ receiveMessage(ReceiverName) ->
 % Function to send messages (directly called in the main process)
 sendMessage(SenderName, ReceiverName) -> 
     % io:format("~s: ", [SenderName]),  % Explicit prompt for message
-    String = string:trim(io:get_line("You:")),  % Capture the input after the prompt
+    String = string:trim(io:get_line("You: ")),  % Capture the input after the prompt
     case String of
         "bye" -> 
             global:send(ReceiverName, bye),  % Send the 'bye' message globally
-            ok;  % Terminates the chat
+            ok,
+            halt();  % Terminates the chat
         _ -> 
             global:send(ReceiverName, {SenderName, String}),  % Send the message globally
             sendMessage(SenderName, ReceiverName)  % Continue sending messages
